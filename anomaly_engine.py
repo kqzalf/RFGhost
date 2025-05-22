@@ -6,36 +6,36 @@ from logger import logger
 
 class AnomalyEngine:
     """Engine for detecting anomalies in RF signals.
-    
+
     This class implements various statistical methods to detect
     anomalies in RF signal patterns.
     """
-    
+
     def __init__(self, threshold: float = 2.0) -> None:
         """Initialize the anomaly detection engine.
-        
+
         Args:
             threshold: Standard deviation threshold for anomaly detection
         """
         self.threshold = threshold
         self.baseline: Optional[np.ndarray] = None
         self.logger = logger
-    
+
     def set_baseline(self, data: List[float]) -> None:
         """Set the baseline data for anomaly detection.
-        
+
         Args:
             data: List of baseline signal measurements
         """
         self.baseline = np.array(data)
         self.logger.info(f"Baseline set with {len(data)} samples")
-    
+
     def detect_anomalies(self, data: List[float]) -> Tuple[List[bool], List[float]]:
         """Detect anomalies in the given signal data.
-        
+
         Args:
             data: List of signal measurements to analyze
-            
+
         Returns:
             Tuple containing:
             - List of boolean values indicating anomalies
@@ -44,23 +44,23 @@ class AnomalyEngine:
         if self.baseline is None:
             self.logger.warning("No baseline set, using input data as baseline")
             self.set_baseline(data)
-        
+
         signal = np.array(data)
         mean = np.mean(self.baseline)
         std = np.std(self.baseline)
-        
+
         if std == 0:
             self.logger.warning("Zero standard deviation in baseline")
             return [False] * len(data), [0.0] * len(data)
-        
+
         z_scores = np.abs((signal - mean) / std)
         anomalies = z_scores > self.threshold
-        
+
         return anomalies.tolist(), z_scores.tolist()
-    
+
     def get_statistics(self) -> Dict[str, float]:
         """Get current statistics of the baseline data.
-        
+
         Returns:
             Dictionary containing statistical measures
         """
@@ -71,7 +71,7 @@ class AnomalyEngine:
                 'min': 0.0,
                 'max': 0.0
             }
-        
+
         return {
             'mean': float(np.mean(self.baseline)),
             'std': float(np.std(self.baseline)),
