@@ -1,189 +1,127 @@
 """Alert management module for RFGhost.
 
-This module handles the generation, formatting, and transmission of alerts
-when RF anomalies are detected. It supports multiple alert channels including
-console output, webhook notifications, and log files.
+This module handles sending alerts to various channels (Slack, webhooks, etc.)
+when anomalies are detected.
 """
 
 import logging
-import time
-from datetime import datetime
-from typing import Dict, Optional
-
 import requests
+from typing import Dict, Any, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RFGhost')
 
 class AlertManager:
-    """Manages alert generation and transmission for RF anomalies.
+    """Manages sending alerts to various channels."""
     
-    This class handles the formatting and sending of alerts through various
-    channels when RF anomalies are detected. It supports multiple alert
-    formats and transmission methods.
-    """
-    
-    def __init__(self, config: Dict):
-        """Initialize the alert manager with configuration.
+    def __init__(self, webhook_url: str):
+        """Initialize the alert manager.
         
         Args:
-            config: Configuration dictionary containing alert settings
+            webhook_url: URL for the webhook (e.g., Slack webhook)
         """
-        self.config = config
-        self.alert_count = 0
-        self.last_alert_time = 0
-        self.alert_cooldown = config.get('alert_cooldown', 300)  # 5 minutes default
-        self.webhook_url = config.get('webhook_url')
-        self.alert_format = config.get('alert_format', 'cyberpunk')
+        self.webhook_url = webhook_url
         
-    def _format_alert(self, anomaly_data: Dict) -> str:
+    def send_alert(self, anomaly_data: Dict[str, Any]) -> bool:
+        """Send an alert for a detected anomaly.
+        
+        Args:
+            anomaly_data: Dictionary containing anomaly information
+            
+        Returns:
+            True if alert was sent successfully, False otherwise
+        """
+        try:
+            # Format the alert message
+            message = self._format_alert(anomaly_data)
+            
+            # Send to webhook
+            response = requests.post(
+                self.webhook_url,
+                json=message,
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                logger.info("Alert sent successfully")
+                return True
+            else:
+                logger.error("Failed to send alert: %s", response.text)
+                return False
+                
+        except Exception as e:
+            logger.error("Error sending alert: %s", str(e))
+            return False
+            
+    def _format_alert(self, anomaly_data: Dict[str, Any]) -> Dict[str, Any]:
         """Format anomaly data into an alert message.
         
         Args:
             anomaly_data: Dictionary containing anomaly information
             
         Returns:
-            str: Formatted alert message
+            Formatted alert message
         """
-        if self.alert_format == 'cyberpunk':
-            return self._format_cyberpunk(anomaly_data)
-        return self._format_standard(anomaly_data)
+        return {
+            "text": f"*RFGhost Alert:* `{anomaly_data['type']}`\n"
+                   f"> Freq: {anomaly_data['details']['frequency']} MHz | "
+                   f"Confidence: {anomaly_data['confidence']:.1%}",
+            "attachments": [{
+                "color": self._get_alert_color(anomaly_data),
+                "fields": [
+                    {
+                        "title": "Details",
+                        "value": self._format_details(anomaly_data),
+                        "short": False
+                    }
+                ]
+            }]
+        }
         
-    def _format_cyberpunk(self, anomaly_data: Dict) -> str:
-        """Format alert in cyberpunk style.
+    def _get_alert_color(self, anomaly_data: Dict[str, Any]) -> str:
+        """Get the color for the alert based on anomaly type.
         
         Args:
             anomaly_data: Dictionary containing anomaly information
             
         Returns:
-            str: Cyberpunk-styled alert message
+            Color code for the alert
         """
-        freq = anomaly_data.get('frequency', 0)
-        rssi = anomaly_data.get('rssi', 0)
-        entropy = anomaly_data.get('entropy', 0)
-        pattern = anomaly_data.get('pattern_match', 0)
-        quality = anomaly_data.get('signal_quality', 0)
+        colors = {
+            "ghost_echo": "#FF0000",  # Red
+            "void_pulse": "#FFA500",  # Orange
+            "static_burst": "#FFFF00",  # Yellow
+            "freq_shift": "#00FF00",  # Green
+            "pattern": "#0000FF"  # Blue
+        }
+        return colors.get(anomaly_data["type"], "#808080")  # Default to gray
         
-        return (
-            f"╔════════════════════════════════════════════════════════════╗\n"
-            f"║                    RF ANOMALY DETECTED                      ║\n"
-            f"╠════════════════════════════════════════════════════════════╣\n"
-            f"║ Frequency: {freq:>8.3f} MHz                                ║\n"
-            f"║ Signal Strength: {rssi:>4} dBm                             ║\n"
-            f"║ Entropy: {entropy:>8.2f}                                   ║\n"
-            f"║ Pattern Match: {pattern:>6.2f}                             ║\n"
-            f"║ Signal Quality: {quality:>6.2f}                            ║\n"
-            f"║ Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ║\n"
-            f"╚════════════════════════════════════════════════════════════╝"
-        )
-        
-    def _format_standard(self, anomaly_data: Dict) -> str:
-        """Format alert in standard style.
+    def _format_details(self, anomaly_data: Dict[str, Any]) -> str:
+        """Format the details section of the alert.
         
         Args:
             anomaly_data: Dictionary containing anomaly information
             
         Returns:
-            str: Standard alert message
+            Formatted details string
         """
-        return (
-            f"RF Anomaly Detected:\n"
-            f"Frequency: {anomaly_data.get('frequency', 0):.3f} MHz\n"
-            f"Signal Strength: {anomaly_data.get('rssi', 0)} dBm\n"
-            f"Entropy: {anomaly_data.get('entropy', 0):.2f}\n"
-            f"Pattern Match: {anomaly_data.get('pattern_match', 0):.2f}\n"
-            f"Signal Quality: {anomaly_data.get('signal_quality', 0):.2f}\n"
-            f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        
-    def _check_cooldown(self) -> bool:
-        """Check if enough time has passed since last alert.
-        
-        Returns:
-            bool: True if cooldown period has passed, False otherwise
-        """
-        current_time = time.time()
-        if current_time - self.last_alert_time < self.alert_cooldown:
-            return False
-        self.last_alert_time = current_time
-        return True
-        
-    def _send_webhook(self, message: str) -> bool:
-        """Send alert to webhook URL.
-        
-        Args:
-            message: Alert message to send
-            
-        Returns:
-            bool: True if webhook notification successful, False otherwise
-        """
-        if not self.webhook_url:
-            return False
-            
-        try:
-            response = requests.post(
-                self.webhook_url,
-                json={'message': message},
-                timeout=5
-            )
-            return response.status_code == 200
-        except Exception as e:
-            logger.error("Failed to send webhook alert: %s", str(e))
-            return False
-            
-    def send_alert(self, anomaly_data: Dict) -> bool:
-        """Send alert for detected anomaly.
-        
-        Args:
-            anomaly_data: Dictionary containing anomaly information
-            
-        Returns:
-            bool: True if alert was sent successfully, False otherwise
-        """
-        if not self._check_cooldown():
-            return False
-            
-        self.alert_count += 1
-        message = self._format_alert(anomaly_data)
-        
-        # Log alert
-        logger.info("Alert #%d: %s", self.alert_count, message)
-        
-        # Send webhook if configured
-        if self.webhook_url:
-            if not self._send_webhook(message):
-                logger.error("Failed to send webhook alert")
-                return False
-                
-        return True
+        details = anomaly_data["details"]
+        return "\n".join(f"{k}: {v}" for k, v in details.items())
 
-# Create a singleton instance
-ALERT_MANAGER = None
-
-def get_alert_manager(config: Dict = None) -> AlertManager:
-    """Get or create the alert manager singleton.
+def get_alert_manager(webhook_url: str) -> AlertManager:
+    """Get or create the global alert manager instance.
     
     Args:
-        config: Configuration dictionary
+        webhook_url: URL for the webhook
         
     Returns:
-        AlertManager: Alert manager instance
+        AlertManager instance
     """
-    global ALERT_MANAGER
-    if ALERT_MANAGER is None:
-        ALERT_MANAGER = AlertManager(config or {})
-    return ALERT_MANAGER
+    global _alert_manager
+    if _alert_manager is None:
+        _alert_manager = AlertManager(webhook_url)
+    return _alert_manager
 
-def send_alert(anomaly_data: Dict, config: Dict = None) -> bool:
-    """Public interface for sending alerts.
-    
-    Args:
-        anomaly_data: Dictionary containing anomaly information
-        config: Configuration dictionary
-        
-    Returns:
-        bool: True if alert was sent successfully, False otherwise
-    """
-    manager = get_alert_manager(config)
-    return manager.send_alert(anomaly_data) 
+# Global instance
+_alert_manager: Optional[AlertManager] = None 

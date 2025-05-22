@@ -6,8 +6,6 @@ to JSONL files with automatic rotation and compression.
 
 import json
 import logging
-import os
-import time
 from datetime import datetime
 from typing import Dict, Optional, Any, List
 from pathlib import Path
@@ -88,7 +86,7 @@ class RFLogger:
                     shutil.copyfileobj(f_in, f_out)
             self.current_file.unlink()  # Remove original file
         except Exception as e:
-            logger.error(f"Failed to compress log file: {e}")
+            logger.error("Failed to compress log file: %s", str(e))
             
     def _cleanup_old_files(self) -> None:
         """Remove old log files if we have too many."""
@@ -104,7 +102,7 @@ class RFLogger:
                 oldest = log_files.pop(0)
                 oldest.unlink()
         except Exception as e:
-            logger.error(f"Failed to cleanup old log files: {e}")
+            logger.error("Failed to cleanup old log files: %s", str(e))
             
     def log_signal(self, signal_data: Dict[str, Any]) -> bool:
         """Log RF signal data to the current log file.
@@ -132,7 +130,7 @@ class RFLogger:
                 return True
                 
         except Exception as e:
-            logger.error(f"Failed to log signal data: {e}")
+            logger.error("Failed to log signal data: %s", str(e))
             return False
             
     def log_anomaly(self, anomaly_data: Dict[str, Any]) -> bool:
@@ -161,7 +159,7 @@ class RFLogger:
                 return True
                 
         except Exception as e:
-            logger.error(f"Failed to log anomaly data: {e}")
+            logger.error("Failed to log anomaly data: %s", str(e))
             return False
             
     def get_recent_logs(self, count: int = 100) -> List[Dict[str, Any]]:
@@ -191,7 +189,7 @@ class RFLogger:
             return logs
             
         except Exception as e:
-            logger.error(f"Failed to read recent logs: {e}")
+            logger.error("Failed to read recent logs: %s", str(e))
             return []
 
 def get_rf_logger(log_dir: str = "logs") -> RFLogger:

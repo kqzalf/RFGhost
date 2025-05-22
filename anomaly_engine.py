@@ -5,7 +5,6 @@ including ghost echoes, void pulses, static bursts, and frequency shifts.
 """
 
 import logging
-import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Any, Callable
@@ -231,7 +230,7 @@ class AnomalyEngine:
                 if anomaly:
                     anomalies.append(anomaly)
             except Exception as e:
-                logger.error(f"Error in anomaly detection: {e}")
+                logger.error("Error in anomaly detection: %s", str(e))
                 
         return anomalies
 

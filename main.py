@@ -9,15 +9,13 @@ import argparse
 import logging
 import signal
 import sys
-import time
 from typing import Dict, List, Optional, Any
 import yaml
-from pathlib import Path
 
 from rf_interface import get_rf_interface, scan_frequency
-from anomaly_engine import get_anomaly_engine, AnomalyThresholds, detect_anomalies
-from logger import get_rf_logger, log_anomaly
-from alerts import get_alert_manager, send_alert
+from anomaly_engine import get_anomaly_engine, AnomalyThresholds
+from logger import get_rf_logger
+from alerts import get_alert_manager
 
 # Configure logging
 logging.basicConfig(
@@ -84,13 +82,13 @@ class RFGhost:
                 
             return config
         except FileNotFoundError:
-            logger.error(f"Configuration file not found: {config_path}")
+            logger.error("Configuration file not found: %s", config_path)
             sys.exit(1)
         except yaml.YAMLError as e:
-            logger.error(f"Invalid YAML in configuration file: {e}")
+            logger.error("Invalid YAML in configuration file: %s", str(e))
             sys.exit(1)
         except Exception as e:
-            logger.error(f"Failed to load configuration: {e}")
+            logger.error("Failed to load configuration: %s", str(e))
             sys.exit(1)
             
     def _handle_shutdown(self, signum: int, frame: Any) -> None:
@@ -115,7 +113,7 @@ class RFGhost:
         try:
             return scan_frequency(freq)
         except Exception as e:
-            logger.error(f"Error scanning frequency {freq} MHz: {e}")
+            logger.error("Error scanning frequency %s MHz: %s", freq, str(e))
             return None
             
     def _process_anomalies(self, anomalies: List[Dict[str, Any]]) -> None:
@@ -128,19 +126,19 @@ class RFGhost:
             try:
                 # Log the anomaly
                 if self.logger.log_anomaly(anomaly):
-                    logger.info(f"Logged anomaly: {anomaly['type']}")
+                    logger.info("Logged anomaly: %s", anomaly['type'])
                     
                 # Send alert
                 if self.alert_manager.send_alert(anomaly):
-                    logger.info(f"Sent alert for: {anomaly['type']}")
+                    logger.info("Sent alert for: %s", anomaly['type'])
                     
             except Exception as e:
-                logger.error(f"Error processing anomaly: {e}")
+                logger.error("Error processing anomaly: %s", str(e))
                 
     def run(self) -> None:
         """Main program loop."""
         logger.info("Starting RFGhost...")
-        logger.info(f"Monitoring frequencies: {self.frequencies}")
+        logger.info("Monitoring frequencies: %s", self.frequencies)
         
         while self.running:
             try:
@@ -154,7 +152,7 @@ class RFGhost:
                         continue
                         
                     # Detect anomalies
-                    anomalies = detect_anomalies(signal_data)
+                    anomalies = self.anomaly_engine.detect_anomalies(signal_data)
                     if anomalies:
                         self._process_anomalies(anomalies)
                         
@@ -162,7 +160,7 @@ class RFGhost:
                     time.sleep(self.scan_interval)
                     
             except Exception as e:
-                logger.error(f"Error in main loop: {e}")
+                logger.error("Error in main loop: %s", str(e))
                 time.sleep(5)  # Wait before retrying
                 
         logger.info("RFGhost shutdown complete")
