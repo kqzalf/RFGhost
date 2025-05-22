@@ -92,12 +92,12 @@ class RFGhost:
             logger.error("Failed to load configuration: %s", str(e))
             sys.exit(1)
             
-    def _handle_shutdown(self, signum: int, frame: Any) -> None:
+    def _handle_shutdown(self, _signum: int, _frame: Any) -> None:
         """Handle shutdown signals gracefully.
         
         Args:
-            signum: Signal number
-            frame: Current stack frame
+            _signum: Signal number (unused)
+            _frame: Current stack frame (unused)
         """
         logger.info("Shutting down RFGhost...")
         self.running = False

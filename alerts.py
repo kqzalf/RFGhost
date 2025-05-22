@@ -49,7 +49,7 @@ class AlertManager:
             logger.error("Failed to send alert: %s", response.text)
             return False
                 
-        except Exception as e:
+        except (requests.RequestException, ValueError) as e:
             logger.error("Error sending alert: %s", str(e))
             return False
             
