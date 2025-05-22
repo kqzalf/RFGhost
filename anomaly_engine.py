@@ -90,7 +90,7 @@ class AnomalyEngine:
             Anomaly dictionary if detected, None otherwise
         """
         if (signal["rssi"] > self.thresholds.rssi_high and 
-            signal["entropy"] > self.thresholds.entropy_threshold):
+                signal["entropy"] > self.thresholds.entropy_threshold):
             return {
                 "type": AnomalyType.GHOST_ECHO,
                 "confidence": self._calculate_signal_strength(signal["rssi"]),
@@ -112,7 +112,7 @@ class AnomalyEngine:
             Anomaly dictionary if detected, None otherwise
         """
         if (signal["rssi"] < self.thresholds.rssi_low and 
-            signal["entropy"] > self.thresholds.entropy_threshold):
+                signal["entropy"] > self.thresholds.entropy_threshold):
             return {
                 "type": AnomalyType.VOID_PULSE,
                 "confidence": 1 - self._calculate_signal_strength(signal["rssi"]),
@@ -140,7 +140,7 @@ class AnomalyEngine:
         rssi_diff = abs(signal["rssi"] - prev_signal["rssi"])
         
         if (rssi_diff > 20 and  # Sudden change in signal strength
-            signal["entropy"] > 0.9):  # High entropy indicates noise
+                signal["entropy"] > 0.9):  # High entropy indicates noise
             return {
                 "type": AnomalyType.STATIC_BURST,
                 "confidence": min(1.0, rssi_diff / 40.0),
@@ -229,7 +229,7 @@ class AnomalyEngine:
                 anomaly = detector(signal)
                 if anomaly:
                     anomalies.append(anomaly)
-            except Exception as e:
+            except (ValueError, KeyError, TypeError) as e:
                 logger.error("Error in anomaly detection: %s", str(e))
                 
         return anomalies

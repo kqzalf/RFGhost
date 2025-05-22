@@ -60,8 +60,8 @@ class RFLogger:
         """Rotate log files if current file is too large or doesn't exist."""
         with self._lock:
             if (self.current_file is None or 
-                not self.current_file.exists() or 
-                self.current_size >= self.max_file_size):
+                    not self.current_file.exists() or 
+                    self.current_size >= self.max_file_size):
                 
                 # Close current file if it exists
                 if self.current_file and self.current_file.exists():
@@ -85,7 +85,7 @@ class RFLogger:
                 with gzip.open(gz_file, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
             self.current_file.unlink()  # Remove original file
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to compress log file: %s", str(e))
             
     def _cleanup_old_files(self) -> None:
@@ -101,7 +101,7 @@ class RFLogger:
             while len(log_files) >= self.max_files:
                 oldest = log_files.pop(0)
                 oldest.unlink()
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to cleanup old log files: %s", str(e))
             
     def log_signal(self, signal_data: Dict[str, Any]) -> bool:
@@ -129,7 +129,7 @@ class RFLogger:
                 self.current_size += len(json_data.encode("utf-8"))
                 return True
                 
-        except Exception as e:
+        except (IOError, OSError, json.JSONDecodeError) as e:
             logger.error("Failed to log signal data: %s", str(e))
             return False
             
@@ -158,7 +158,7 @@ class RFLogger:
                 self.current_size += len(json_data.encode("utf-8"))
                 return True
                 
-        except Exception as e:
+        except (IOError, OSError, json.JSONDecodeError) as e:
             logger.error("Failed to log anomaly data: %s", str(e))
             return False
             
@@ -188,7 +188,7 @@ class RFLogger:
                         
             return logs
             
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to read recent logs: %s", str(e))
             return []
 

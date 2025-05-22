@@ -5,8 +5,8 @@ when anomalies are detected.
 """
 
 import logging
-import requests
 from typing import Dict, Any, Optional
+import requests
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,9 +46,8 @@ class AlertManager:
             if response.status_code == 200:
                 logger.info("Alert sent successfully")
                 return True
-            else:
-                logger.error("Failed to send alert: %s", response.text)
-                return False
+            logger.error("Failed to send alert: %s", response.text)
+            return False
                 
         except Exception as e:
             logger.error("Error sending alert: %s", str(e))

@@ -9,6 +9,7 @@ import argparse
 import logging
 import signal
 import sys
+import time
 from typing import Dict, List, Optional, Any
 import yaml
 
@@ -112,7 +113,7 @@ class RFGhost:
         """
         try:
             return scan_frequency(freq)
-        except Exception as e:
+        except (ValueError, IOError, OSError) as e:
             logger.error("Error scanning frequency %s MHz: %s", freq, str(e))
             return None
             
@@ -132,7 +133,7 @@ class RFGhost:
                 if self.alert_manager.send_alert(anomaly):
                     logger.info("Sent alert for: %s", anomaly['type'])
                     
-            except Exception as e:
+            except (ValueError, KeyError, IOError) as e:
                 logger.error("Error processing anomaly: %s", str(e))
                 
     def run(self) -> None:
@@ -159,7 +160,7 @@ class RFGhost:
                     # Sleep between scans
                     time.sleep(self.scan_interval)
                     
-            except Exception as e:
+            except (ValueError, IOError, OSError) as e:
                 logger.error("Error in main loop: %s", str(e))
                 time.sleep(5)  # Wait before retrying
                 

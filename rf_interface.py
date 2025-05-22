@@ -7,8 +7,8 @@ and performing signal detection and analysis.
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
-import spidev
 import numpy as np
+import spidev
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +37,7 @@ class RFInterface:
             self.spi.open(self.bus, self.device)
             self.spi.max_speed_hz = 1000000
             self.spi.mode = 0
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to open SPI connection: %s", str(e))
             raise
             
@@ -45,7 +45,7 @@ class RFInterface:
         """Close SPI connection."""
         try:
             self.spi.close()
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to close SPI connection: %s", str(e))
             
     def _write_register(self, address: int, value: int) -> None:
@@ -57,7 +57,7 @@ class RFInterface:
         """
         try:
             self.spi.xfer([address, value])
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to write register: %s", str(e))
             raise
             
@@ -73,7 +73,7 @@ class RFInterface:
         try:
             response = self.spi.xfer([address | 0x80, 0])
             return response[1]
-        except Exception as e:
+        except (IOError, OSError) as e:
             logger.error("Failed to read register: %s", str(e))
             raise
             
@@ -197,7 +197,7 @@ class RFInterface:
                 }
             }
             
-        except Exception as e:
+        except (ValueError, IOError, OSError) as e:
             logger.error("Error scanning frequency: %s", str(e))
             raise
             
