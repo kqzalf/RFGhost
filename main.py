@@ -11,7 +11,7 @@ from pathlib import Path
 from rf_interface import get_rf_interface, scan_frequency
 from anomaly_engine import get_anomaly_engine, AnomalyThresholds, detect_anomalies
 from logger import get_rf_logger, log_anomaly
-from alerts import get_alert_manager, send_alert
+from RFGhost.alerts import get_alert_manager, send_alert
 
 # Configure logging
 logging.basicConfig(
