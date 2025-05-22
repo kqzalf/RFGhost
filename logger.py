@@ -7,7 +7,6 @@ with features like file rotation and compression.
 import logging
 import json
 import os
-import time
 import gzip
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -102,7 +101,7 @@ class RFLogger:
                     self._compress_old_log(self.current_log)
                     
             # Write to log file
-            with open(self.current_log, 'a') as f:
+            with open(self.current_log, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
                 
             # Cleanup old files
@@ -130,7 +129,7 @@ class RFLogger:
                     self._compress_old_log(self.current_log)
                     
             # Write to log file
-            with open(self.current_log, 'a') as f:
+            with open(self.current_log, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
                 
             # Cleanup old files
@@ -153,7 +152,7 @@ class RFLogger:
                 return []
                 
             # Read last n lines
-            with open(self.current_log, 'r') as f:
+            with open(self.current_log, 'r', encoding='utf-8') as f:
                 lines = f.readlines()[-count:]
                 
             # Parse JSON entries

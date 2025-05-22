@@ -9,9 +9,9 @@ import logging
 import signal
 import sys
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from rf_interface import get_rf_interface, scan_frequency
-from anomaly_engine import get_anomaly_engine, AnomalyType
+from anomaly_engine import get_anomaly_engine
 from logger import RFLogger
 from alerts import AlertManager
 
@@ -32,7 +32,7 @@ class RFGhost:
         self.rf = get_rf_interface()
         self.anomaly_engine = get_anomaly_engine()
         self.logger = RFLogger()
-        self.alert_manager = AlertManager()
+        self.alert_manager = AlertManager(webhook_url=self.config.get("webhook_url", ""))
         self.running = False
         self.frequencies = self.config.get("frequencies", [433.92, 868.0, 915.0])
         self.scan_interval = self.config.get("scan_interval", 1.0)
@@ -113,7 +113,8 @@ def main() -> None:
     """Main entry point."""
     config = {
         "frequencies": [433.92, 868.0, 915.0],
-        "scan_interval": 1.0
+        "scan_interval": 1.0,
+        "webhook_url": ""  # Add your webhook URL here
     }
     
     rfghost = RFGhost(config)
