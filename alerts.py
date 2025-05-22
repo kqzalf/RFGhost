@@ -14,18 +14,18 @@ logger = logging.getLogger('RFGhost')
 
 class AlertManager:
     """Manages sending alerts to various channels."""
-    
+
     def __init__(self, webhook_url: str):
         """Initialize the alert manager.
-        
+
         Args:
             webhook_url: URL for the webhook (e.g., Slack webhook)
         """
         self.webhook_url = webhook_url
-    
+
     def send_alert(self, anomaly_data: Dict[str, Any]) -> bool:
         """Send an alert for a detected anomaly.
-        
+
         Args:
             anomaly_data: Dictionary containing anomaly information
         Returns:
@@ -48,17 +48,20 @@ class AlertManager:
         except (requests.RequestException, ValueError) as e:
             logger.error("Error sending alert: %s", str(e))
             return False
-    
+
     def _format_alert(self, anomaly_data: Dict[str, Any]) -> Dict[str, Any]:
         """Format the alert message for sending.
-        
+
         Args:
             anomaly_data: Dictionary containing anomaly information
         Returns:
             Formatted message dictionary
         """
+        anomalies = anomaly_data.get('anomalies', [])
+        signal = anomaly_data.get('signal', {})
         return {
-            "text": f"RF Anomaly Detected: {anomaly_data.get('anomalies', [])}\nDetails: {anomaly_data.get('signal', {})}"
+            "text": f"RF Anomaly Detected: {anomalies}\nDetails: {signal}"
         }
 
-global_alert_manager: Optional[AlertManager] = None 
+global_alert_manager: Optional[AlertManager] = None
+
