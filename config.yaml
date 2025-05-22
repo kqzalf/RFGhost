@@ -1,0 +1,84 @@
+# RFGhost Configuration
+
+# Frequencies to monitor (in MHz)
+# CC1101 Frequency Bands:
+# - 300-348 MHz
+# - 387-464 MHz
+# - 779-928 MHz
+frequencies:
+  # 300-348 MHz Band
+  - 315.0   # Common for garage doors, car remotes
+  - 318.0   # Industrial control
+  - 322.0   # Industrial control
+  - 325.0   # Industrial control
+  - 328.0   # Industrial control
+  - 331.0   # Industrial control
+  - 334.0   # Industrial control
+  - 337.0   # Industrial control
+  - 340.0   # Industrial control
+  - 343.0   # Industrial control
+  - 346.0   # Industrial control
+
+  # 387-464 MHz Band
+  - 390.0   # Industrial control
+  - 400.0   # Industrial control
+  - 410.0   # Industrial control
+  - 420.0   # Industrial control
+  - 430.0   # Industrial control
+  - 433.92  # Common ISM band (garage doors, weather stations)
+  - 434.0   # Industrial control
+  - 440.0   # Industrial control
+  - 450.0   # Industrial control
+  - 460.0   # Industrial control
+
+  # 779-928 MHz Band
+  - 780.0   # Industrial control
+  - 800.0   # Industrial control
+  - 820.0   # Industrial control
+  - 840.0   # Industrial control
+  - 860.0   # Industrial control
+  - 868.0   # European ISM band
+  - 880.0   # Industrial control
+  - 900.0   # Industrial control
+  - 915.0   # US ISM band
+  - 920.0   # Industrial control
+  - 928.0   # Industrial control
+
+# Signal thresholds
+rssi_threshold_high: -50  # dBm
+rssi_threshold_low: -90   # dBm
+entropy_threshold: 0.8    # 80%
+duration_threshold: 2.0   # seconds
+pattern_threshold: 0.7    # 70% similarity
+
+# Scanning configuration
+scan_interval: 0.5  # seconds between frequency scans (reduced for wider coverage)
+
+# Logging configuration
+log_dir: "logs"           # Directory for log files
+max_log_size_mb: 10       # Maximum size of each log file
+max_log_files: 5          # Maximum number of log files to keep
+compress_logs: true       # Whether to compress old log files
+
+# Alert configuration
+slack_webhook: "YOUR_SLACK_WEBHOOK_URL"  # Replace with your webhook URL
+alert_retry_count: 3      # Number of retries for failed alerts
+alert_retry_delay: 1.0    # Delay between retries in seconds
+
+# Hardware configuration
+spi_bus: 0               # SPI bus number
+spi_device: 0            # SPI device number
+spi_speed_hz: 1000000    # SPI clock speed
+
+# CC1101 specific settings
+cc1101_settings:
+  channel_spacing: 0.2    # MHz between channels
+  channel_bandwidth: 0.2  # MHz bandwidth per channel
+  modulation: "FSK"      # Modulation type (FSK, GFSK, MSK, OOK)
+  data_rate: 1.2         # kbps
+  deviation: 45          # kHz frequency deviation
+  sync_mode: 0           # Sync word mode
+  sync_word: [0xD3, 0x91] # Sync word bytes
+  packet_length: 0       # Variable packet length
+  crc_enabled: true      # Enable CRC checking
+  whitening_enabled: true # Enable data whitening
