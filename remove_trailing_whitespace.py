@@ -1,3 +1,5 @@
+"""Script to remove trailing whitespace from Python files in the current directory."""
+
 import os
 
 

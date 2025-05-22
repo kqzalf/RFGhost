@@ -38,6 +38,20 @@ jobs:
             pip install spidev
           fi
 
-      - name: Run pylint
+      - name: Run pylint and check score
         run: |
-          pylint $(git ls-files '*.py')
+          pylint $(git ls-files '*.py') --exit-zero > pylint-report.txt
+          SCORE=$(tail -n 2 pylint-report.txt | grep 'rated at' | sed -E 's/.*rated at ([0-9\.]+)\/10.*/\1/')
+          echo "Pylint score: $SCORE"
+          if (( $(echo "$SCORE < 9.5" | bc -l) )); then
+            echo "Pylint score too low: $SCORE"
+            cat pylint-report.txt
+            exit 1
+          fi
+          cat pylint-report.txt
+
+      - name: Upload pylint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pylint-report
+          path: pylint-report.txt
