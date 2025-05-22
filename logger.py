@@ -1,192 +1,171 @@
-"""Logging module for RF signal data and anomalies.
+"""RF signal logging module.
 
 This module provides functionality for logging RF signal data and anomalies
-to JSONL files with automatic rotation and compression.
+with features like file rotation and compression.
 """
 
-import json
 import logging
-from datetime import datetime
-from typing import Dict, Optional, Any, List
-from pathlib import Path
+import json
+import os
+import time
 import gzip
-import shutil
-import threading
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RFGhost')
 
 class RFLogger:
-    """Logger for RF signal data and anomalies with file rotation and compression."""
+    """Logger for RF signal data and anomalies."""
     
-    def __init__(self, 
-                 log_dir: str = "logs",
-                 max_file_size_mb: int = 10,
-                 max_files: int = 5,
-                 compress_old: bool = True):
-        """Initialize the RF signal logger.
+    def __init__(self, log_dir: str = "logs", max_size: int = 10 * 1024 * 1024):
+        """Initialize the RF logger.
         
         Args:
-            log_dir: Directory to store log files
-            max_file_size_mb: Maximum size of each log file in MB
-            max_files: Maximum number of log files to keep
-            compress_old: Whether to compress old log files
+            log_dir: Directory for log files
+            max_size: Maximum log file size in bytes
         """
-        self.log_dir = Path(log_dir)
-        self.max_file_size = max_file_size_mb * 1024 * 1024  # Convert to bytes
-        self.max_files = max_files
-        self.compress_old = compress_old
-        self.current_file = None
-        self.current_size = 0
-        self._lock = threading.Lock()  # Thread safety
+        self.log_dir = log_dir
+        self.max_size = max_size
+        self.current_log = os.path.join(log_dir, "current.log")
+        self._ensure_log_dir()
         
-        # Create log directory if it doesn't exist
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize current log file
-        self._rotate_if_needed()
-        
-    def _get_current_log_file(self) -> Path:
-        """Get the path for the current log file.
-        
-        Returns:
-            Path object for the log file
-        """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return self.log_dir / f"rfghost_{timestamp}.jsonl"
-        
-    def _rotate_if_needed(self) -> None:
-        """Rotate log files if current file is too large or doesn't exist."""
-        with self._lock:
-            if (self.current_file is None or 
-                    not self.current_file.exists() or 
-                    self.current_size >= self.max_file_size):
-                
-                # Close current file if it exists
-                if self.current_file and self.current_file.exists():
-                    self._compress_old_log()
-                    
-                # Create new log file
-                self.current_file = self._get_current_log_file()
-                self.current_size = 0
-                
-                # Clean up old files
-                self._cleanup_old_files()
-                
-    def _compress_old_log(self) -> None:
-        """Compress the previous log file if compression is enabled."""
-        if not self.compress_old:
-            return
-            
+    def _ensure_log_dir(self) -> None:
+        """Ensure log directory exists."""
         try:
-            gz_file = self.current_file.with_suffix('.jsonl.gz')
-            with open(self.current_file, 'rb') as f_in:
-                with gzip.open(gz_file, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            self.current_file.unlink()  # Remove original file
+            os.makedirs(self.log_dir, exist_ok=True)
+        except (IOError, OSError) as e:
+            logger.error("Failed to create log directory: %s", str(e))
+            raise
+            
+    def _compress_old_log(self, log_file: str) -> None:
+        """Compress old log file.
+        
+        Args:
+            log_file: Path to log file
+        """
+        try:
+            if not os.path.exists(log_file):
+                return
+                
+            # Create compressed filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            compressed_file = f"{log_file}.{timestamp}.gz"
+            
+            # Compress file
+            with open(log_file, 'rb') as f_in:
+                with gzip.open(compressed_file, 'wb') as f_out:
+                    f_out.writelines(f_in)
+                    
+            # Remove original file
+            os.remove(log_file)
+            
         except (IOError, OSError) as e:
             logger.error("Failed to compress log file: %s", str(e))
             
     def _cleanup_old_files(self) -> None:
-        """Remove old log files if we have too many."""
+        """Clean up old log files."""
         try:
-            # Get all log files (including compressed ones)
-            log_files = list(self.log_dir.glob("rfghost_*.jsonl*"))
+            # List all files in log directory
+            files = os.listdir(self.log_dir)
             
-            # Sort by modification time (oldest first)
-            log_files.sort(key=lambda x: x.stat().st_mtime)
+            # Sort by modification time
+            files.sort(key=lambda x: os.path.getmtime(os.path.join(self.log_dir, x)))
             
-            # Remove oldest files if we have too many
-            while len(log_files) >= self.max_files:
-                oldest = log_files.pop(0)
-                oldest.unlink()
+            # Keep only last 10 files
+            for file in files[:-10]:
+                try:
+                    os.remove(os.path.join(self.log_dir, file))
+                except (IOError, OSError) as e:
+                    logger.error("Failed to remove old log file: %s", str(e))
+                    
         except (IOError, OSError) as e:
-            logger.error("Failed to cleanup old log files: %s", str(e))
+            logger.error("Failed to cleanup old files: %s", str(e))
             
-    def log_signal(self, signal_data: Dict[str, Any]) -> bool:
-        """Log RF signal data to the current log file.
+    def log_signal(self, signal_data: Dict[str, Any]) -> None:
+        """Log RF signal data.
         
         Args:
-            signal_data: Dictionary containing signal data
-            
-        Returns:
-            True if logging successful, False otherwise
+            signal_data: Signal data to log
         """
         try:
-            with self._lock:
-                self._rotate_if_needed()
-                
-                # Add timestamp if not present
-                if "timestamp" not in signal_data:
-                    signal_data["timestamp"] = datetime.now().isoformat()
+            # Add timestamp
+            signal_data["timestamp"] = datetime.now().isoformat()
+            
+            # Convert to JSON
+            log_entry = json.dumps(signal_data) + "\n"
+            
+            # Check file size
+            if os.path.exists(self.current_log):
+                if os.path.getsize(self.current_log) > self.max_size:
+                    self._compress_old_log(self.current_log)
                     
-                # Convert to JSON and write to file
-                json_data = json.dumps(signal_data) + "\n"
-                with open(self.current_file, "a", encoding="utf-8") as f:
-                    f.write(json_data)
-                    
-                self.current_size += len(json_data.encode("utf-8"))
-                return True
+            # Write to log file
+            with open(self.current_log, 'a') as f:
+                f.write(log_entry)
                 
+            # Cleanup old files
+            self._cleanup_old_files()
+            
         except (IOError, OSError, json.JSONDecodeError) as e:
             logger.error("Failed to log signal data: %s", str(e))
-            return False
             
-    def log_anomaly(self, anomaly_data: Dict[str, Any]) -> bool:
-        """Log anomaly data to the current log file.
+    def log_anomaly(self, anomaly_data: Dict[str, Any]) -> None:
+        """Log RF anomaly data.
         
         Args:
-            anomaly_data: Dictionary containing anomaly data
-            
-        Returns:
-            True if logging successful, False otherwise
+            anomaly_data: Anomaly data to log
         """
         try:
-            with self._lock:
-                self._rotate_if_needed()
-                
-                # Add timestamp if not present
-                if "timestamp" not in anomaly_data:
-                    anomaly_data["timestamp"] = datetime.now().isoformat()
+            # Add timestamp
+            anomaly_data["timestamp"] = datetime.now().isoformat()
+            
+            # Convert to JSON
+            log_entry = json.dumps(anomaly_data) + "\n"
+            
+            # Check file size
+            if os.path.exists(self.current_log):
+                if os.path.getsize(self.current_log) > self.max_size:
+                    self._compress_old_log(self.current_log)
                     
-                # Convert to JSON and write to file
-                json_data = json.dumps(anomaly_data) + "\n"
-                with open(self.current_file, "a", encoding="utf-8") as f:
-                    f.write(json_data)
-                    
-                self.current_size += len(json_data.encode("utf-8"))
-                return True
+            # Write to log file
+            with open(self.current_log, 'a') as f:
+                f.write(log_entry)
                 
+            # Cleanup old files
+            self._cleanup_old_files()
+            
         except (IOError, OSError, json.JSONDecodeError) as e:
             logger.error("Failed to log anomaly data: %s", str(e))
-            return False
             
     def get_recent_logs(self, count: int = 100) -> List[Dict[str, Any]]:
-        """Get recent log entries from the current log file.
+        """Get recent log entries.
         
         Args:
             count: Number of entries to retrieve
             
         Returns:
-            List of log entries as dictionaries
+            List of recent log entries
         """
         try:
-            if not self.current_file or not self.current_file.exists():
+            if not os.path.exists(self.current_log):
                 return []
                 
-            logs = []
-            with open(self.current_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        log_entry = json.loads(line.strip())
-                        logs.append(log_entry)
-                        if len(logs) >= count:
-                            break
-                    except json.JSONDecodeError:
-                        continue
-                        
-            return logs
+            # Read last n lines
+            with open(self.current_log, 'r') as f:
+                lines = f.readlines()[-count:]
+                
+            # Parse JSON entries
+            entries = []
+            for line in lines:
+                try:
+                    entry = json.loads(line.strip())
+                    entries.append(entry)
+                except json.JSONDecodeError:
+                    continue
+                    
+            return entries
             
         except (IOError, OSError) as e:
             logger.error("Failed to read recent logs: %s", str(e))

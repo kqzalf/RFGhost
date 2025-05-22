@@ -1,4 +1,4 @@
-"""Anomaly detection engine for RF signal analysis.
+"""RF anomaly detection engine.
 
 This module implements various algorithms for detecting anomalies in RF signals,
 including ghost echoes, void pulses, static bursts, and frequency shifts.
@@ -7,8 +7,7 @@ including ghost echoes, void pulses, static bursts, and frequency shifts.
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
-
+from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 
 # Configure logging
@@ -16,223 +15,199 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RFGhost')
 
 class AnomalyType(Enum):
-    """Types of RF anomalies that can be detected."""
-    GHOST_ECHO = "ghost_echo"      # Strong, high-entropy signals
-    VOID_PULSE = "void_pulse"      # Weak but high-entropy signals
-    STATIC_BURST = "static_burst"  # Sudden bursts of static
-    FREQ_SHIFT = "freq_shift"      # Unexpected frequency shifts
-    PATTERN = "pattern"            # Known signal patterns
+    """Types of RF anomalies."""
+    GHOST_ECHO = "ghost_echo"
+    VOID_PULSE = "void_pulse"
+    STATIC_BURST = "static_burst"
+    FREQ_SHIFT = "freq_shift"
+    KNOWN_SIGNAL = "known_signal"
 
 @dataclass
 class AnomalyThresholds:
     """Configuration thresholds for anomaly detection."""
-    rssi_high: int = -50  # dBm
-    rssi_low: int = -90   # dBm
-    entropy_threshold: float = 0.8  # 80%
-    duration_threshold: float = 2.0  # seconds
-    pattern_threshold: float = 0.7  # 70% similarity
+    rssi_threshold: int = -80  # dBm
+    lqi_threshold: int = 50    # 0-255
+    quality_threshold: float = 0.3  # 0-1
+    entropy_threshold: float = 0.7  # 0-1
+    freq_shift_threshold: float = 0.1  # MHz
+    static_burst_duration: float = 0.5  # seconds
+    ghost_echo_delay: float = 0.1  # seconds
+    void_pulse_duration: float = 0.2  # seconds
 
 class AnomalyEngine:
-    """Engine for detecting anomalies in RF signals."""
+    """Engine for detecting RF anomalies."""
     
-    def __init__(self, thresholds: Optional[AnomalyThresholds] = None):
-        """Initialize the anomaly detection engine.
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize the anomaly engine.
         
         Args:
-            thresholds: Configuration thresholds for detection
+            config: Optional configuration dictionary
         """
-        self.thresholds = thresholds or AnomalyThresholds()
-        self.history: List[Dict[str, Any]] = []
-        self.history_size = 100  # Keep last 100 signals for pattern analysis
+        self.thresholds = AnomalyThresholds(**(config or {}))
+        self.signal_history: List[Dict[str, Any]] = []
+        self.history_size = 100
         
-    def _calculate_signal_strength(self, rssi: int) -> float:
-        """Convert RSSI to a normalized signal strength (0-1).
+    def _detect_ghost_echo(self, signal: Dict[str, Any]) -> bool:
+        """Detect ghost echo pattern.
         
         Args:
-            rssi: Signal strength in dBm
+            signal: Current signal data
             
         Returns:
-            Normalized signal strength between 0 and 1
+            True if ghost echo detected
         """
-        # RSSI typically ranges from -120 to -30 dBm
-        return max(0, min(1, (rssi + 120) / 90))
+        if len(self.signal_history) < 2:
+            return False
+            
+        # Check for delayed signal repetition
+        prev_signal = self.signal_history[-1]
+        if (abs(signal["rssi"] - prev_signal["rssi"]) < 5 and
+            abs(signal["lqi"] - prev_signal["lqi"]) < 10):
+            return True
+            
+        return False
         
-    def _calculate_entropy(self, samples: List[int]) -> float:
-        """Calculate Shannon entropy of signal samples.
+    def _detect_void_pulse(self, signal: Dict[str, Any]) -> bool:
+        """Detect void pulse pattern.
         
         Args:
-            samples: List of signal samples
+            signal: Current signal data
             
         Returns:
-            Entropy value between 0 and 1
+            True if void pulse detected
         """
-        if not samples:
-            return 0.0
+        if len(self.signal_history) < 2:
+            return False
             
-        # Convert to numpy array for efficient processing
-        samples_array = np.array(samples)
+        # Check for sudden signal drop
+        prev_signal = self.signal_history[-1]
+        if (signal["rssi"] < self.thresholds.rssi_threshold and
+            prev_signal["rssi"] > self.thresholds.rssi_threshold):
+            return True
+            
+        return False
         
-        # Calculate histogram
-        hist, _ = np.histogram(samples_array, bins=256, density=True)
-        hist = hist[hist > 0]  # Remove zero bins
-        
-        # Calculate entropy
-        entropy = -np.sum(hist * np.log2(hist))
-        return min(1.0, entropy / 8.0)  # Normalize to 0-1 range
-        
-    def _detect_ghost_echo(self, signal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Detect strong, high-entropy signals (potential intentional transmissions).
+    def _detect_static_burst(self, signal: Dict[str, Any]) -> bool:
+        """Detect static burst pattern.
         
         Args:
-            signal: Signal data dictionary
+            signal: Current signal data
             
         Returns:
-            Anomaly dictionary if detected, None otherwise
+            True if static burst detected
         """
-        if (signal["rssi"] > self.thresholds.rssi_high and 
-                signal["entropy"] > self.thresholds.entropy_threshold):
-            return {
-                "type": AnomalyType.GHOST_ECHO,
-                "confidence": self._calculate_signal_strength(signal["rssi"]),
-                "details": {
-                    "rssi": signal["rssi"],
-                    "entropy": signal["entropy"],
-                    "frequency": signal["frequency"]
-                }
-            }
-        return None
+        if len(self.signal_history) < 2:
+            return False
+            
+        # Check for sustained high signal
+        if (signal["rssi"] > self.thresholds.rssi_threshold and
+            signal["lqi"] < self.thresholds.lqi_threshold):
+            return True
+            
+        return False
         
-    def _detect_void_pulse(self, signal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Detect very weak but high-entropy signals (potential hidden transmissions).
+    def _detect_freq_shift(self, signal: Dict[str, Any]) -> bool:
+        """Detect frequency shift.
         
         Args:
-            signal: Signal data dictionary
+            signal: Current signal data
             
         Returns:
-            Anomaly dictionary if detected, None otherwise
+            True if frequency shift detected
         """
-        if (signal["rssi"] < self.thresholds.rssi_low and 
-                signal["entropy"] > self.thresholds.entropy_threshold):
-            return {
-                "type": AnomalyType.VOID_PULSE,
-                "confidence": 1 - self._calculate_signal_strength(signal["rssi"]),
-                "details": {
-                    "rssi": signal["rssi"],
-                    "entropy": signal["entropy"],
-                    "frequency": signal["frequency"]
-                }
-            }
-        return None
-        
-    def _detect_static_burst(self, signal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Detect sudden bursts of static noise.
-        
-        Args:
-            signal: Signal data dictionary
+        if len(self.signal_history) < 2:
+            return False
             
-        Returns:
-            Anomaly dictionary if detected, None otherwise
-        """
-        if len(self.history) < 2:
-            return None
-            
-        prev_signal = self.history[-1]
-        rssi_diff = abs(signal["rssi"] - prev_signal["rssi"])
-        
-        if (rssi_diff > 20 and  # Sudden change in signal strength
-                signal["entropy"] > 0.9):  # High entropy indicates noise
-            return {
-                "type": AnomalyType.STATIC_BURST,
-                "confidence": min(1.0, rssi_diff / 40.0),
-                "details": {
-                    "rssi_diff": rssi_diff,
-                    "entropy": signal["entropy"],
-                    "frequency": signal["frequency"]
-                }
-            }
-        return None
-        
-    def _detect_frequency_shift(self, signal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Detect unexpected frequency shifts.
-        
-        Args:
-            signal: Signal data dictionary
-            
-        Returns:
-            Anomaly dictionary if detected, None otherwise
-        """
-        if len(self.history) < 2:
-            return None
-            
-        prev_signal = self.history[-1]
+        # Check for sudden frequency change
+        prev_signal = self.signal_history[-1]
         freq_diff = abs(signal["frequency"] - prev_signal["frequency"])
+        if freq_diff > self.thresholds.freq_shift_threshold:
+            return True
+            
+        return False
         
-        if freq_diff > 0.1:  # More than 100 kHz shift
-            return {
-                "type": AnomalyType.FREQ_SHIFT,
-                "confidence": min(1.0, freq_diff / 1.0),  # Normalize to 0-1
-                "details": {
-                    "freq_diff": freq_diff,
-                    "old_freq": prev_signal["frequency"],
-                    "new_freq": signal["frequency"]
-                }
-            }
-        return None
-        
-    def _detect_signal_pattern(self, signal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Detect known signal patterns.
+    def _detect_known_signal(self, signal: Dict[str, Any]) -> bool:
+        """Detect known signal pattern.
         
         Args:
-            signal: Signal data dictionary
+            signal: Current signal data
             
         Returns:
-            Anomaly dictionary if detected, None otherwise
+            True if known signal detected
         """
-        if "pattern_match" in signal and signal["pattern_match"] > self.thresholds.pattern_threshold:
-            return {
-                "type": AnomalyType.PATTERN,
-                "confidence": signal["pattern_match"],
-                "details": {
-                    "pattern_score": signal["pattern_match"],
-                    "frequency": signal["frequency"]
-                }
-            }
-        return None
+        # Check signal characteristics against known patterns
+        if (signal["quality"] > self.thresholds.quality_threshold and
+            signal["entropy"] < self.thresholds.entropy_threshold):
+            return True
+            
+        return False
         
-    def detect_anomalies(self, signal: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Analyze a signal for various types of anomalies.
+    def _calculate_signal_strength(self, signal: Dict[str, Any]) -> float:
+        """Calculate signal strength score.
         
         Args:
-            signal: Signal data dictionary
+            signal: Signal data
             
         Returns:
-            List of detected anomalies
+            Signal strength score (0-1)
         """
-        anomalies = []
+        rssi_norm = max(0, min(1, (signal["rssi"] + 120) / 90))
+        lqi_norm = signal["lqi"] / 255
+        return 0.7 * rssi_norm + 0.3 * lqi_norm
         
-        # Update history
-        self.history.append(signal)
-        if len(self.history) > self.history_size:
-            self.history.pop(0)
+    def _calculate_entropy(self, signal: Dict[str, Any]) -> float:
+        """Calculate signal entropy.
+        
+        Args:
+            signal: Signal data
             
-        # Run all detection methods
-        detection_methods: List[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = [
-            self._detect_ghost_echo,
-            self._detect_void_pulse,
-            self._detect_static_burst,
-            self._detect_frequency_shift,
-            self._detect_signal_pattern
-        ]
+        Returns:
+            Entropy score (0-1)
+        """
+        rssi_samples = signal["samples"]["rssi"]
+        hist, _ = np.histogram(rssi_samples, bins=256, density=True)
+        hist = hist[hist > 0]
+        entropy = -np.sum(hist * np.log2(hist))
+        return min(1.0, entropy / 8.0)
         
-        for detector in detection_methods:
-            try:
-                anomaly = detector(signal)
-                if anomaly:
-                    anomalies.append(anomaly)
-            except (ValueError, KeyError, TypeError) as e:
-                logger.error("Error in anomaly detection: %s", str(e))
+    def detect_anomalies(self, signal: Dict[str, Any]) -> List[AnomalyType]:
+        """Detect anomalies in the signal.
+        
+        Args:
+            signal: Signal data to analyze
+            
+        Returns:
+            List of detected anomaly types
+        """
+        try:
+            # Update signal history
+            self.signal_history.append(signal)
+            if len(self.signal_history) > self.history_size:
+                self.signal_history.pop(0)
                 
-        return anomalies
+            # Detect anomalies
+            anomalies = []
+            
+            if self._detect_ghost_echo(signal):
+                anomalies.append(AnomalyType.GHOST_ECHO)
+                
+            if self._detect_void_pulse(signal):
+                anomalies.append(AnomalyType.VOID_PULSE)
+                
+            if self._detect_static_burst(signal):
+                anomalies.append(AnomalyType.STATIC_BURST)
+                
+            if self._detect_freq_shift(signal):
+                anomalies.append(AnomalyType.FREQ_SHIFT)
+                
+            if self._detect_known_signal(signal):
+                anomalies.append(AnomalyType.KNOWN_SIGNAL)
+                
+            return anomalies
+            
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error("Error detecting anomalies: %s", str(e))
+            return []
 
 def get_anomaly_engine(thresholds: Optional[AnomalyThresholds] = None) -> AnomalyEngine:
     """Get or create the global anomaly engine instance.
