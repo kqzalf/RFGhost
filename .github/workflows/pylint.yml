@@ -53,5 +53,5 @@ jobs:
       - name: Upload pylint report
         uses: actions/upload-artifact@v4
         with:
-          name: pylint-report
+          name: pylint-report-${{ github.run_number }}
           path: pylint-report.txt
