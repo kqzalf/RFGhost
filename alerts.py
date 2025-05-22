@@ -1,1 +1,19 @@
-"""Module for handling alerts in the RFGhost system."""# pylint: disable=too-few-public-methodsclass Alerts:    """Class for managing alerts in the RFGhost system."""    def __init__(self) -> None:        """Initialize the Alerts class."""        # pylint: disable=unnecessary-pass        pass    def send_alert(self, message: str) -> None:        """Send an alert message.        Args:            message: The alert message to send.        """        # pylint: disable=unnecessary-pass        pass
+"""Module for handling alerts in the RFGhost system."""
+
+# pylint: disable=too-few-public-methods
+class Alerts:
+    """Class for managing alerts in the RFGhost system."""
+
+    def __init__(self) -> None:
+        """Initialize the Alerts class."""
+        # pylint: disable=unnecessary-pass
+        pass
+
+    def send_alert(self, message: str) -> None:
+        """Send an alert message.
+
+        Args:
+            message: The alert message to send.
+        """
+        # pylint: disable=unnecessary-pass
+        pass

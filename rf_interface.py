@@ -1,1 +1,15 @@
-"""Module for interfacing with RF hardware."""# pylint: disable=too-few-public-methodsclass RFInterface:    """Class for managing RF hardware interface."""    def __init__(self) -> None:        """Initialize the RFInterface class."""        # pylint: disable=unnecessary-pass        pass    def scan(self) -> None:        """Scan for RF signals."""        # pylint: disable=unnecessary-pass        pass
+"""Module for interfacing with RF hardware."""
+
+# pylint: disable=too-few-public-methods
+class RFInterface:
+    """Class for managing RF hardware interface."""
+
+    def __init__(self) -> None:
+        """Initialize the RFInterface class."""
+        # pylint: disable=unnecessary-pass
+        pass
+
+    def scan(self) -> None:
+        """Scan for RF signals."""
+        # pylint: disable=unnecessary-pass
+        pass
