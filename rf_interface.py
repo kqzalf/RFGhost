@@ -1,18 +1,26 @@
-# Simulated RF interface for testing. Replace with real CC1101 SPI calls.
-import random, time
-import spidev
+"""RF interface module for CC1101 transceiver communication.
+
+This module provides a high-level interface for communicating with the CC1101
+RF transceiver chip via SPI. It handles initialization, configuration,
+frequency scanning, and signal analysis.
+"""
+
 import logging
-from typing import Dict, Optional, Tuple, List
 import math
+import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, Optional, Tuple, List
+
 import numpy as np
+import spidev
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RFGhost')
 
 class ModulationType(Enum):
+    """Enumeration of supported modulation types for CC1101."""
     FSK = 0x02
     GFSK = 0x03
     MSK = 0x07
@@ -20,6 +28,7 @@ class ModulationType(Enum):
 
 @dataclass
 class SignalMetrics:
+    """Data class for storing signal measurement metrics."""
     rssi: int
     lqi: int
     crc_ok: bool
@@ -86,17 +95,23 @@ CC1101_SWORRST = 0x3C  # Reset real time clock
 CC1101_SNOP = 0x3D  # No operation
 
 class CC1101Interface:
+    """Interface class for CC1101 RF transceiver communication."""
+    
     def __init__(self, bus: int = 0, device: int = 0, speed_hz: int = 1000000, config: Dict = None):
-        """Initialize CC1101 interface with SPI communication."""
+        """Initialize CC1101 interface with SPI communication.
+        
+        Args:
+            bus: SPI bus number
+            device: SPI device number
+            speed_hz: SPI clock speed in Hz
+            config: Configuration dictionary
+        """
         self.spi = spidev.SpiDev()
         self.spi.open(bus, device)
         self.spi.max_speed_hz = speed_hz
         self.spi.mode = 0
         
-        # Initialize logging
         self.logger = logging.getLogger('RFGhost')
-        
-        # Store configuration
         self.config = config or {}
         
         # Initialize state variables
@@ -107,45 +122,43 @@ class CC1101Interface:
         self._power_mode = 'active'
         
         # Initialize CC1101
-        self._initialize_chip()
-        
+        if not self._initialize_chip():
+            raise RuntimeError("Failed to initialize CC1101 chip")
+            
     def _initialize_chip(self) -> bool:
-        """Initialize the CC1101 chip with proper sequence."""
+        """Initialize the CC1101 chip with proper sequence.
+        
+        Returns:
+            bool: True if initialization successful, False otherwise
+        """
         try:
-            # Reset chip
             self._reset()
             time.sleep(0.1)
             
-            # Verify chip
             if not self._verify_chip():
                 return False
                 
-            # Configure chip
             self._configure_chip()
-            
-            # Perform initial calibration
             self._calibrate_frequency()
             
             return True
         except Exception as e:
-            self.logger.error(f"Failed to initialize CC1101: {e}")
+            self.logger.error("Failed to initialize CC1101: %s", str(e))
             return False
             
     def _calibrate_frequency(self) -> None:
         """Calibrate frequency synthesizer."""
         try:
-            # Enter calibration mode
             self.spi.xfer([CC1101_SCAL])
             time.sleep(0.1)
             
-            # Wait for calibration to complete
             while self._read_register(CC1101_MARCSTATE) != 0x01:
                 time.sleep(0.01)
                 
             self._last_calibration = time.time()
             self.logger.info("Frequency calibration completed")
         except Exception as e:
-            self.logger.error(f"Frequency calibration failed: {e}")
+            self.logger.error("Frequency calibration failed: %s", str(e))
             
     def _check_calibration(self) -> None:
         """Check if frequency calibration is needed."""
@@ -158,10 +171,14 @@ class CC1101Interface:
         time.sleep(0.1)
         
     def _verify_chip(self) -> bool:
-        """Verify CC1101 chip is present and responding."""
+        """Verify CC1101 chip is present and responding.
+        
+        Returns:
+            bool: True if chip is valid, False otherwise
+        """
         version = self._read_register(CC1101_VERSION)
         if version != 0x14:  # Expected version for CC1101
-            self.logger.error(f"Invalid CC1101 version: {version}")
+            self.logger.error("Invalid CC1101 version: %d", version)
             return False
         self.logger.info("CC1101 initialized successfully")
         return True
@@ -176,13 +193,13 @@ class CC1101Interface:
             mod_type = ModulationType[modulation]
             self._write_register(CC1101_MDMCFG2, mod_type.value)
         except KeyError:
-            self.logger.warning(f"Invalid modulation type: {modulation}, using FSK")
+            self.logger.warning("Invalid modulation type: %s, using FSK", modulation)
             self._write_register(CC1101_MDMCFG2, ModulationType.FSK.value)
             
         # Set data rate with error checking
         data_rate = settings.get('data_rate', 1.2)  # kbps
         if not 0.6 <= data_rate <= 500:
-            self.logger.warning(f"Data rate {data_rate} kbps out of range, using 1.2 kbps")
+            self.logger.warning("Data rate %f kbps out of range, using 1.2 kbps", data_rate)
             data_rate = 1.2
             
         drate_e = int(math.log2(data_rate * 1000 / 0.024))
@@ -193,7 +210,7 @@ class CC1101Interface:
         # Set frequency deviation with validation
         deviation = settings.get('deviation', 45)  # kHz
         if not 1.587 <= deviation <= 380:
-            self.logger.warning(f"Deviation {deviation} kHz out of range, using 45 kHz")
+            self.logger.warning("Deviation %f kHz out of range, using 45 kHz", deviation)
             deviation = 45
             
         dev_e = int(math.log2(deviation / 1.587))
@@ -221,16 +238,35 @@ class CC1101Interface:
         self._write_register(CC1101_MCSM2, 0x07)  # RX timeout after 64 bytes
         
     def _read_register(self, address: int) -> int:
-        """Read a single register from CC1101."""
+        """Read a single register from CC1101.
+        
+        Args:
+            address: Register address to read
+            
+        Returns:
+            int: Register value
+        """
         response = self.spi.xfer([address | 0x80, 0x00])
         return response[1]
         
     def _write_register(self, address: int, value: int) -> None:
-        """Write a single register to CC1101."""
+        """Write a single register to CC1101.
+        
+        Args:
+            address: Register address to write
+            value: Value to write
+        """
         self.spi.xfer([address, value])
         
     def _calculate_freq_registers(self, freq_mhz: float) -> Tuple[int, int, int]:
-        """Calculate frequency register values for given frequency in MHz."""
+        """Calculate frequency register values for given frequency in MHz.
+        
+        Args:
+            freq_mhz: Frequency in MHz
+            
+        Returns:
+            Tuple[int, int, int]: Frequency register values (freq2, freq1, freq0)
+        """
         freq_hz = int(freq_mhz * 1000000)
         freq_reg = int(freq_hz / (26 * 1000000) * 65536)
         freq2 = (freq_reg >> 16) & 0xFF
@@ -239,32 +275,50 @@ class CC1101Interface:
         return freq2, freq1, freq0
         
     def set_frequency(self, freq_mhz: float) -> bool:
-        """Set the CC1101 to the specified frequency in MHz."""
+        """Set the CC1101 to the specified frequency in MHz.
+        
+        Args:
+            freq_mhz: Frequency in MHz
+            
+        Returns:
+            bool: True if frequency set successfully, False otherwise
+        """
         try:
             # Validate frequency is within CC1101's range
             if not (300 <= freq_mhz <= 348 or 387 <= freq_mhz <= 464 or 779 <= freq_mhz <= 928):
-                self.logger.error(f"Frequency {freq_mhz} MHz is outside CC1101's range")
+                self.logger.error("Frequency %f MHz is outside CC1101's range", freq_mhz)
                 return False
                 
             freq2, freq1, freq0 = self._calculate_freq_registers(freq_mhz)
             self._write_register(CC1101_FREQ2, freq2)
             self._write_register(CC1101_FREQ1, freq1)
             self._write_register(CC1101_FREQ0, freq0)
-            self.logger.info(f"Tuned to {freq_mhz} MHz")
+            self.logger.info("Tuned to %f MHz", freq_mhz)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to set frequency: {e}")
+            self.logger.error("Failed to set frequency: %s", str(e))
             return False
             
     def get_rssi(self) -> int:
-        """Read RSSI value from CC1101."""
+        """Read RSSI value from CC1101.
+        
+        Returns:
+            int: RSSI value in dBm
+        """
         rssi = self._read_register(CC1101_RSSI)
         if rssi >= 128:
             return (rssi - 256) // 2 - 74
         return rssi // 2 - 74
         
-    def calculate_entropy(self, samples: list) -> float:
-        """Calculate Shannon entropy of signal samples."""
+    def calculate_entropy(self, samples: List[int]) -> float:
+        """Calculate Shannon entropy of signal samples.
+        
+        Args:
+            samples: List of signal samples
+            
+        Returns:
+            float: Entropy value
+        """
         if not samples:
             return 0.0
         value_counts = {}
@@ -277,7 +331,11 @@ class CC1101Interface:
         return entropy
         
     def set_power_mode(self, mode: str) -> None:
-        """Set power mode of the CC1101."""
+        """Set power mode of the CC1101.
+        
+        Args:
+            mode: Power mode ('sleep', 'idle', or 'active')
+        """
         if mode == self._power_mode:
             return
             
@@ -289,10 +347,18 @@ class CC1101Interface:
             self.spi.xfer([CC1101_SRX])
             
         self._power_mode = mode
-        self.logger.info(f"Power mode set to {mode}")
+        self.logger.info("Power mode set to %s", mode)
         
     def calculate_signal_quality(self, rssi: int, lqi: int) -> float:
-        """Calculate signal quality metric from RSSI and LQI."""
+        """Calculate signal quality metric from RSSI and LQI.
+        
+        Args:
+            rssi: RSSI value in dBm
+            lqi: Link Quality Indicator value
+            
+        Returns:
+            float: Signal quality metric (0-1)
+        """
         # Normalize RSSI to 0-1 range (-120 dBm to 0 dBm)
         rssi_norm = (rssi + 120) / 120
         
@@ -303,16 +369,19 @@ class CC1101Interface:
         return 0.7 * rssi_norm + 0.3 * lqi_norm
         
     def detect_signal_pattern(self, samples: List[int]) -> float:
-        """Detect if signal matches known patterns."""
+        """Detect if signal matches known patterns.
+        
+        Args:
+            samples: List of signal samples
+            
+        Returns:
+            float: Pattern match score (0-1)
+        """
         if not samples:
             return 0.0
             
         # Convert samples to numpy array for efficient processing
         samples_array = np.array(samples)
-        
-        # Calculate basic statistics
-        mean = np.mean(samples_array)
-        std = np.std(samples_array)
         
         # Check for periodic patterns
         if len(samples) > 10:
@@ -334,7 +403,14 @@ class CC1101Interface:
         return 0.0
         
     def scan_frequency(self, freq_mhz: float) -> Optional[SignalMetrics]:
-        """Scan for signals at specified frequency and return signal metrics."""
+        """Scan for signals at specified frequency and return signal metrics.
+        
+        Args:
+            freq_mhz: Frequency to scan in MHz
+            
+        Returns:
+            Optional[SignalMetrics]: Signal metrics if scan successful, None otherwise
+        """
         try:
             # Check if calibration is needed
             self._check_calibration()
@@ -382,7 +458,7 @@ class CC1101Interface:
             )
             
         except Exception as e:
-            self.logger.error(f"Error scanning frequency {freq_mhz} MHz: {e}")
+            self.logger.error("Error scanning frequency %f MHz: %s", freq_mhz, str(e))
             return None
             
     def close(self) -> None:
@@ -391,20 +467,35 @@ class CC1101Interface:
             self.set_power_mode('sleep')
             self.spi.close()
         except Exception as e:
-            self.logger.error(f"Error closing interface: {e}")
+            self.logger.error("Error closing interface: %s", str(e))
 
 # Create a singleton instance
-_rf_interface = None
+RF_INTERFACE = None
 
 def get_rf_interface(config: Dict = None) -> CC1101Interface:
-    """Get or create the RF interface singleton."""
-    global _rf_interface
-    if _rf_interface is None:
-        _rf_interface = CC1101Interface(config=config)
-    return _rf_interface
+    """Get or create the RF interface singleton.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        CC1101Interface: RF interface instance
+    """
+    global RF_INTERFACE
+    if RF_INTERFACE is None:
+        RF_INTERFACE = CC1101Interface(config=config)
+    return RF_INTERFACE
 
 def scan_frequency(freq: float, config: Dict = None) -> Dict:
-    """Public interface for scanning a frequency."""
+    """Public interface for scanning a frequency.
+    
+    Args:
+        freq: Frequency to scan in MHz
+        config: Configuration dictionary
+        
+    Returns:
+        Dict: Signal metrics dictionary
+    """
     interface = get_rf_interface(config)
     result = interface.scan_frequency(freq)
     if result is None:
@@ -420,4 +511,4 @@ def scan_frequency(freq: float, config: Dict = None) -> Dict:
             "signal_quality": 0.0,
             "timestamp": time.time()
         }
-    return result.__dict__
+    return result.__dict__ 
