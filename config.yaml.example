@@ -1,0 +1,27 @@
+# RFGhost Configuration Example
+
+# Frequencies to monitor (in MHz)
+frequencies:
+  - 315.0  # Common ISM band
+  - 433.92 # Popular for IoT devices
+  - 868.35 # European ISM band
+  - 915.0  # US ISM band
+
+# Detection thresholds
+rssi_threshold_high: -50  # dBm (strong signals)
+rssi_threshold_low: -90   # dBm (weak signals)
+entropy_threshold: 0.8    # 80% (signal complexity)
+duration_threshold: 2.0   # seconds (signal duration)
+pattern_threshold: 0.7    # 70% (pattern matching confidence)
+
+# Scan settings
+scan_interval: 1.0  # seconds between scans
+
+# Logging settings
+log_dir: "logs"
+max_file_size_mb: 10
+max_files: 5
+compress_old: true
+
+# Alert settings
+slack_webhook: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"  # Replace with your webhook URL 

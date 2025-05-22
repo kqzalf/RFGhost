@@ -1,18 +1,27 @@
+"""Logging module for RF signal data and anomalies.
+
+This module provides functionality for logging RF signal data and anomalies
+to JSONL files with automatic rotation and compression.
+"""
+
 import json
 import logging
 import os
 import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 from pathlib import Path
 import gzip
 import shutil
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('RFGhost')
 
 class RFLogger:
+    """Logger for RF signal data and anomalies with file rotation and compression."""
+    
     def __init__(self, 
                  log_dir: str = "logs",
                  max_file_size_mb: int = 10,
@@ -32,6 +41,7 @@ class RFLogger:
         self.compress_old = compress_old
         self.current_file = None
         self.current_size = 0
+        self._lock = threading.Lock()  # Thread safety
         
         # Create log directory if it doesn't exist
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -40,27 +50,32 @@ class RFLogger:
         self._rotate_if_needed()
         
     def _get_current_log_file(self) -> Path:
-        """Get the path for the current log file."""
+        """Get the path for the current log file.
+        
+        Returns:
+            Path object for the log file
+        """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return self.log_dir / f"rfghost_{timestamp}.jsonl"
         
     def _rotate_if_needed(self) -> None:
         """Rotate log files if current file is too large or doesn't exist."""
-        if (self.current_file is None or 
-            not self.current_file.exists() or 
-            self.current_size >= self.max_file_size):
-            
-            # Close current file if it exists
-            if self.current_file and self.current_file.exists():
-                self._compress_old_log()
+        with self._lock:
+            if (self.current_file is None or 
+                not self.current_file.exists() or 
+                self.current_size >= self.max_file_size):
                 
-            # Create new log file
-            self.current_file = self._get_current_log_file()
-            self.current_size = 0
-            
-            # Clean up old files
-            self._cleanup_old_files()
-            
+                # Close current file if it exists
+                if self.current_file and self.current_file.exists():
+                    self._compress_old_log()
+                    
+                # Create new log file
+                self.current_file = self._get_current_log_file()
+                self.current_size = 0
+                
+                # Clean up old files
+                self._cleanup_old_files()
+                
     def _compress_old_log(self) -> None:
         """Compress the previous log file if compression is enabled."""
         if not self.compress_old:
@@ -91,97 +106,107 @@ class RFLogger:
         except Exception as e:
             logger.error(f"Failed to cleanup old log files: {e}")
             
-    def _format_log_entry(self, anomaly: Dict) -> Dict:
-        """Format a log entry with additional metadata."""
-        return {
-            "timestamp": datetime.now().isoformat(),
-            "anomaly": anomaly,
-            "hostname": os.uname().nodename if hasattr(os, 'uname') else "unknown"
-        }
-        
-    def log_anomaly(self, anomaly: Dict) -> bool:
-        """Log an anomaly to the current log file.
+    def log_signal(self, signal_data: Dict[str, Any]) -> bool:
+        """Log RF signal data to the current log file.
         
         Args:
-            anomaly: The anomaly data to log
+            signal_data: Dictionary containing signal data
             
         Returns:
-            bool: True if logging was successful, False otherwise
+            True if logging successful, False otherwise
         """
         try:
-            self._rotate_if_needed()
-            
-            # Format the log entry
-            log_entry = self._format_log_entry(anomaly)
-            log_line = json.dumps(log_entry) + "\n"
-            
-            # Write to file
-            with open(self.current_file, "a") as f:
-                f.write(log_line)
+            with self._lock:
+                self._rotate_if_needed()
                 
-            # Update size
-            self.current_size += len(log_line.encode('utf-8'))
-            
-            return True
-            
+                # Add timestamp if not present
+                if "timestamp" not in signal_data:
+                    signal_data["timestamp"] = datetime.now().isoformat()
+                    
+                # Convert to JSON and write to file
+                json_data = json.dumps(signal_data) + "\n"
+                with open(self.current_file, "a", encoding="utf-8") as f:
+                    f.write(json_data)
+                    
+                self.current_size += len(json_data.encode("utf-8"))
+                return True
+                
         except Exception as e:
-            logger.error(f"Failed to log anomaly: {e}")
+            logger.error(f"Failed to log signal data: {e}")
             return False
             
-    def get_recent_anomalies(self, count: int = 100) -> list:
-        """Get the most recent anomalies from the log files.
+    def log_anomaly(self, anomaly_data: Dict[str, Any]) -> bool:
+        """Log anomaly data to the current log file.
         
         Args:
-            count: Maximum number of anomalies to return
+            anomaly_data: Dictionary containing anomaly data
             
         Returns:
-            list: List of recent anomalies
+            True if logging successful, False otherwise
         """
-        anomalies = []
         try:
-            # Get all log files (including compressed ones)
-            log_files = list(self.log_dir.glob("rfghost_*.jsonl*"))
-            
-            # Sort by modification time (newest first)
-            log_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-            
-            # Read from files until we have enough anomalies
-            for log_file in log_files:
-                if len(anomalies) >= count:
-                    break
+            with self._lock:
+                self._rotate_if_needed()
+                
+                # Add timestamp if not present
+                if "timestamp" not in anomaly_data:
+                    anomaly_data["timestamp"] = datetime.now().isoformat()
                     
-                try:
-                    if log_file.suffix == '.gz':
-                        with gzip.open(log_file, 'rt') as f:
-                            for line in f:
-                                if len(anomalies) >= count:
-                                    break
-                                anomalies.append(json.loads(line))
-                    else:
-                        with open(log_file, 'r') as f:
-                            for line in f:
-                                if len(anomalies) >= count:
-                                    break
-                                anomalies.append(json.loads(line))
-                except Exception as e:
-                    logger.error(f"Error reading log file {log_file}: {e}")
+                # Convert to JSON and write to file
+                json_data = json.dumps(anomaly_data) + "\n"
+                with open(self.current_file, "a", encoding="utf-8") as f:
+                    f.write(json_data)
                     
+                self.current_size += len(json_data.encode("utf-8"))
+                return True
+                
         except Exception as e:
-            logger.error(f"Failed to get recent anomalies: {e}")
+            logger.error(f"Failed to log anomaly data: {e}")
+            return False
             
-        return anomalies[:count]
-
-# Create a singleton instance
-_rf_logger = None
+    def get_recent_logs(self, count: int = 100) -> List[Dict[str, Any]]:
+        """Get recent log entries from the current log file.
+        
+        Args:
+            count: Number of entries to retrieve
+            
+        Returns:
+            List of log entries as dictionaries
+        """
+        try:
+            if not self.current_file or not self.current_file.exists():
+                return []
+                
+            logs = []
+            with open(self.current_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        log_entry = json.loads(line.strip())
+                        logs.append(log_entry)
+                        if len(logs) >= count:
+                            break
+                    except json.JSONDecodeError:
+                        continue
+                        
+            return logs
+            
+        except Exception as e:
+            logger.error(f"Failed to read recent logs: {e}")
+            return []
 
 def get_rf_logger(log_dir: str = "logs") -> RFLogger:
-    """Get or create the RF logger singleton."""
+    """Get or create the global RF logger instance.
+    
+    Args:
+        log_dir: Directory to store log files
+        
+    Returns:
+        RFLogger instance
+    """
     global _rf_logger
     if _rf_logger is None:
         _rf_logger = RFLogger(log_dir)
     return _rf_logger
 
-def log_anomaly(anomaly: Dict, log_dir: str = "logs") -> bool:
-    """Public interface for logging anomalies."""
-    logger = get_rf_logger(log_dir)
-    return logger.log_anomaly(anomaly)
+# Global instance
+_rf_logger: Optional[RFLogger] = None
