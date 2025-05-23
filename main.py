@@ -45,14 +45,14 @@ class RFGhost:
         """
         self.config = config
         self.running = False
-        
+
         # Initialize components
         self.rf_interface = RFInterface(config.get('rf_interface', {}))
         self.anomaly_engine = AnomalyEngine(
             threshold=config.get('anomaly_threshold', 2.0)
         )
         self.alerts = Alerts(config.get('alerts', {}))
-        
+
         # Set up signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -75,10 +75,10 @@ class RFGhost:
 
         self.running = True
         logger.info("Starting RFGhost application")
-        
+
         # Start RF scanning
         self.rf_interface.start_scanning()
-        
+
         # Main processing loop
         while self.running:
             try:
@@ -87,23 +87,23 @@ class RFGhost:
                 if not data:
                     time.sleep(0.1)
                     continue
-                
+
                 # Extract signal values
                 signals = [d['signal'] for d in data]
-                
+
                 # Detect anomalies
                 anomalies, scores = self.anomaly_engine.detect_anomalies(signals)
-                
+
                 # Process any anomalies
                 if any(anomalies):
                     self._handle_anomalies(data, anomalies, scores)
-                
+
                 # Log statistics periodically
                 stats = self.rf_interface.get_signal_statistics()
                 logger.debug(f"Signal statistics: {stats}")
-                
+
                 time.sleep(0.1)  # Prevent tight loop
-                
+
             except (IOError, ValueError) as e:
                 logger.error(f"Error in main loop: {e}")
                 time.sleep(1)  # Prevent tight loop on error
@@ -112,7 +112,7 @@ class RFGhost:
         """Stop the RFGhost application."""
         if not self.running:
             return
-            
+
         logger.info("Stopping RFGhost application")
         self.running = False
         self.rf_interface.stop_scanning()
@@ -127,7 +127,7 @@ class RFGhost:
         """
         # Find indices of anomalies
         anomaly_indices = [i for i, is_anomaly in enumerate(anomalies) if is_anomaly]
-        
+
         # Prepare alert data
         alert_data = {
             'timestamp': time.time(),
@@ -142,7 +142,7 @@ class RFGhost:
             ],
             'statistics': self.rf_interface.get_signal_statistics()
         }
-        
+
         # Send alert
         self.alerts.send_alert('anomaly', alert_data)
 
