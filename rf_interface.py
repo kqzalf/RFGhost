@@ -1,5 +1,5 @@
 """RF interface for RFGhost application."""
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import time
 import threading
 from queue import Queue
@@ -20,61 +20,57 @@ class RFInterface:
         Args:
             config: Dictionary containing RF interface configuration
         """
-        self.config = config
-        self.sample_rate = config.get('sample_rate', 1000)
-        self.frequency = config.get('frequency', 433.92)  # MHz
-        self.gain = config.get('gain', 20)  # dB
-        self.running = False
-        self.data_queue = Queue(maxsize=1000)
-        self.logger = logger
+        self._config = config
+        self._sample_rate = config.get('sample_rate', 1000)
+        self._frequency = config.get('frequency', 433.92)  # MHz
+        self._gain = config.get('gain', 20)  # dB
+        self._running = False
+        self._data_queue = Queue(maxsize=1000)
+        self._scan_thread: Optional[threading.Thread] = None
 
     def start_scanning(self) -> None:
         """Start the RF scanning process in a background thread."""
-        if self.running:
-            self.logger.warning("RF scanning already running")
+        if self._running:
+            logger.warning("RF scanning already running")
             return
 
-        self.running = True
-        self.scan_thread = threading.Thread(target=self._scan_loop)
-        self.scan_thread.daemon = True
-        self.scan_thread.start()
-        self.logger.info("RF scanning started")
+        self._running = True
+        self._scan_thread = threading.Thread(target=self._scan_loop)
+        self._scan_thread.daemon = True
+        self._scan_thread.start()
+        logger.info("RF scanning started")
 
     def stop_scanning(self) -> None:
         """Stop the RF scanning process."""
-        self.running = False
-        if hasattr(self, 'scan_thread'):
-            self.scan_thread.join(timeout=5)
-        self.logger.info("RF scanning stopped")
+        self._running = False
+        if self._scan_thread is not None:
+            self._scan_thread.join(timeout=5)
+        logger.info("RF scanning stopped")
 
     def _scan_loop(self) -> None:
         """Main scanning loop that runs in background thread."""
-        while self.running:
+        while self._running:
             try:
                 # Simulate RF signal acquisition
                 # In a real implementation, this would read from hardware
                 signal = self._acquire_signal()
-                
                 # Add timestamp and metadata
                 data = {
                     'timestamp': time.time(),
                     'signal': signal,
-                    'frequency': self.frequency,
-                    'gain': self.gain
+                    'frequency': self._frequency,
+                    'gain': self._gain
                 }
-                
                 # Add to queue, drop oldest if full
-                if not self.data_queue.full():
-                    self.data_queue.put(data)
+                if not self._data_queue.full():
+                    self._data_queue.put(data)
                 else:
-                    self.data_queue.get()  # Remove oldest
-                    self.data_queue.put(data)
-                
+                    self._data_queue.get()  # Remove oldest
+                    self._data_queue.put(data)
                 # Sleep to maintain sample rate
-                time.sleep(1.0 / self.sample_rate)
-                
-            except Exception as e:
-                self.logger.error(f"Error in scan loop: {e}")
+                time.sleep(1.0 / self._sample_rate)
+            except (IOError, ValueError) as e:
+                logger.error(f"Error in scan loop: {e}")
                 time.sleep(1)  # Prevent tight loop on error
 
     def _acquire_signal(self) -> float:
@@ -97,8 +93,8 @@ class RFInterface:
             List of dictionaries containing signal data
         """
         data = []
-        while not self.data_queue.empty() and len(data) < max_samples:
-            data.append(self.data_queue.get())
+        while not self._data_queue.empty() and len(data) < max_samples:
+            data.append(self._data_queue.get())
         return data
 
     def get_signal_statistics(self, samples: int = 100) -> Dict[str, float]:
@@ -112,12 +108,7 @@ class RFInterface:
         """
         data = self.get_latest_data(samples)
         if not data:
-            return {
-                'mean': 0.0,
-                'std': 0.0,
-                'min': 0.0,
-                'max': 0.0
-            }
+            return self._get_empty_statistics()
 
         signals = [d['signal'] for d in data]
         return {
@@ -125,4 +116,18 @@ class RFInterface:
             'std': float(np.std(signals)),
             'min': float(np.min(signals)),
             'max': float(np.max(signals))
+        }
+
+    @staticmethod
+    def _get_empty_statistics() -> Dict[str, float]:
+        """Get empty statistics dictionary.
+
+        Returns:
+            Dictionary with zero values for all statistics
+        """
+        return {
+            'mean': 0.0,
+            'std': 0.0,
+            'min': 0.0,
+            'max': 0.0
         }

@@ -1,5 +1,5 @@
 """Alert system for RFGhost application."""
-from typing import Dict, List, Optional
+from typing import Dict
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -46,7 +46,7 @@ class Alerts:
             msg['Subject'] = subject
             msg.attach(MIMEText(message, 'plain'))
 
-            with smtplib.SMTP(self.email_config['smtp_server'], 
+            with smtplib.SMTP(self.email_config['smtp_server'],
                             self.email_config['smtp_port']) as server:
                 if self.email_config.get('use_tls', True):
                     server.starttls()
@@ -55,7 +55,7 @@ class Alerts:
                                self.email_config['password'])
                 server.send_message(msg)
             return True
-        except Exception as e:
+        except (smtplib.SMTPException, ConnectionError) as e:
             self.logger.error(f"Failed to send email: {e}")
             return False
 
@@ -80,7 +80,7 @@ class Alerts:
                 timeout=5
             )
             return response.status_code == 200
-        except Exception as e:
+        except (requests.RequestException, ConnectionError) as e:
             self.logger.error(f"Failed to send webhook: {e}")
             return False
 

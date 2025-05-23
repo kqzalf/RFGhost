@@ -57,12 +57,12 @@ class RFGhost:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-    def _signal_handler(self, signum: int, frame: Any) -> None:
+    def _signal_handler(self, signum: int, _frame: Any) -> None:
         """Handle termination signals.
 
         Args:
             signum: Signal number
-            frame: Current stack frame
+            _frame: Current stack frame (unused)
         """
         logger.info(f"Received signal {signum}")
         self.stop()
@@ -104,7 +104,7 @@ class RFGhost:
                 
                 time.sleep(0.1)  # Prevent tight loop
                 
-            except Exception as e:
+            except (IOError, ValueError) as e:
                 logger.error(f"Error in main loop: {e}")
                 time.sleep(1)  # Prevent tight loop on error
 
