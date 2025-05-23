@@ -8,3 +8,4 @@ def get_empty_statistics():
         'min': 0.0,
         'max': 0.0
     }
+
