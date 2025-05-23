@@ -1,27 +1,22 @@
-# RFGhost - RF Anomaly Detection System
+# RFGhost
 
-RFGhost is a sophisticated RF signal monitoring and anomaly detection system designed to identify potential security threats and unusual patterns in radio frequency signals. It uses advanced signal processing and machine learning techniques to detect various types of anomalies, including ghost echoes, void pulses, static bursts, and frequency shifts.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
+[![Pylint Score](https://img.shields.io/badge/pylint-9.96%2F10-brightgreen.svg)](https://github.com/yourusername/RFGhost)
+
+RFGhost is a Python application designed to monitor and detect anomalies in RF signals. It uses statistical methods to analyze signal patterns and alerts users when unusual activity is detected.
 
 ## Features
 
-- **Real-time RF Signal Monitoring**: Continuously monitors specified frequencies for unusual activity
-- **Advanced Anomaly Detection**:
-  - Ghost Echo Detection: Identifies strong, high-entropy signals
-  - Void Pulse Detection: Detects weak but high-entropy signals
-  - Static Burst Detection: Identifies sudden bursts of static noise
-  - Frequency Shift Detection: Monitors for unexpected frequency changes
-  - Pattern Recognition: Detects known signal patterns
-- **Comprehensive Logging**: JSONL-based logging with automatic rotation and compression
-- **Alert System**: Integration with Slack for real-time notifications
-- **Configurable Thresholds**: Adjustable detection parameters
-- **Thread-Safe Operations**: Built-in thread safety for concurrent operations
+- **RF Signal Monitoring**: Continuously scans and processes RF signals.
+- **Anomaly Detection**: Uses statistical analysis to identify unusual signal patterns.
+- **Alert System**: Sends notifications via email and webhooks when anomalies are detected.
+- **Configurable**: Easily customizable through a YAML configuration file.
 
-## Requirements
+## Prerequisites
 
-- Python 3.8 or higher
-- CC1101 RF Transceiver
-- SPI interface
-- Linux-based system (for SPI support)
+- Python 3.10 or higher
+- Required Python packages (see `requirements.txt` and `requirements-dev.txt`)
 
 ## Installation
 
@@ -34,46 +29,16 @@ RFGhost is a sophisticated RF signal monitoring and anomaly detection system des
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt  # For development dependencies
    ```
 
-3. Configure the system:
+3. Configure the application:
    - Copy `config.yaml.example` to `config.yaml`
-   - Edit `config.yaml` with your settings
-
-## Configuration
-
-The system is configured through a YAML file. Here's an example configuration:
-
-```yaml
-# Frequencies to monitor (in MHz)
-frequencies:
-  - 433.92
-  - 868.35
-  - 915.0
-
-# Detection thresholds
-rssi_threshold_high: -50  # dBm
-rssi_threshold_low: -90   # dBm
-entropy_threshold: 0.8    # 80%
-duration_threshold: 2.0   # seconds
-pattern_threshold: 0.7    # 70% similarity
-
-# Scan settings
-scan_interval: 1.0  # seconds
-
-# Logging settings
-log_dir: "logs"
-max_file_size_mb: 10
-max_files: 5
-compress_old: true
-
-# Alert settings
-slack_webhook: "https://hooks.slack.com/services/your/webhook/url"
-```
+   - Update the configuration settings as needed
 
 ## Usage
 
-1. Start the system:
+1. Start the application:
    ```bash
    python main.py
    ```
@@ -83,53 +48,25 @@ slack_webhook: "https://hooks.slack.com/services/your/webhook/url"
    python main.py --debug
    ```
 
-3. Use a custom config file:
+3. Use a custom configuration file:
    ```bash
    python main.py -c custom_config.yaml
    ```
 
-## Anomaly Types
+## Configuration
 
-1. **Ghost Echo**
-   - Strong, high-entropy signals
-   - Potential intentional transmissions
-   - High confidence when RSSI > -50 dBm
-
-2. **Void Pulse**
-   - Weak but high-entropy signals
-   - Potential hidden transmissions
-   - High confidence when RSSI < -90 dBm
-
-3. **Static Burst**
-   - Sudden bursts of static noise
-   - Potential interference or jamming
-   - Detected by rapid RSSI changes
-
-4. **Frequency Shift**
-   - Unexpected frequency changes
-   - Potential frequency hopping
-   - Detected by frequency changes > 100 kHz
-
-5. **Pattern**
-   - Known signal patterns
-   - Potential protocol identification
-   - Pattern matching confidence > 70%
-
-## Logging
-
-The system maintains detailed logs in JSONL format:
-- Automatic log rotation
-- Compression of old logs
-- Thread-safe logging operations
-- Configurable log size and retention
+The `config.yaml` file allows you to customize:
+- RF interface settings (sample rate, frequency, gain)
+- Anomaly detection threshold
+- Alert settings (email, webhook)
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
 
 ## License
 
@@ -137,21 +74,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- CC1101 library contributors
-- Python community
-- Open source RF analysis tools
-
-## Support
-
-For support, please:
-1. Check the [documentation](docs/)
-2. Open an issue
-3. Contact the maintainers
-
-## Roadmap
-
-- [ ] Machine learning-based anomaly detection
-- [ ] Web interface for monitoring
-- [ ] Additional protocol support
-- [ ] Mobile app integration
-- [ ] Cloud synchronization
+- Thanks to the open-source community for their contributions and support.
