@@ -2,6 +2,7 @@
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 from logger import logger
+from utils import get_empty_statistics
 
 
 class AnomalyEngine:
@@ -65,25 +66,10 @@ class AnomalyEngine:
             Dictionary containing statistical measures
         """
         if self.baseline is None:
-            return self._get_empty_statistics()
-
+            return get_empty_statistics()
         return {
             'mean': float(np.mean(self.baseline)),
             'std': float(np.std(self.baseline)),
             'min': float(np.min(self.baseline)),
             'max': float(np.max(self.baseline))
-        }
-
-    @staticmethod
-    def _get_empty_statistics() -> Dict[str, float]:
-        """Get empty statistics dictionary.
-
-        Returns:
-            Dictionary with zero values for all statistics
-        """
-        return {
-            'mean': 0.0,
-            'std': 0.0,
-            'min': 0.0,
-            'max': 0.0
         }

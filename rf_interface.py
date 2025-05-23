@@ -5,6 +5,7 @@ import threading
 from queue import Queue
 import numpy as np
 from logger import logger
+from utils import get_empty_statistics
 
 
 class RFInterface:
@@ -108,26 +109,11 @@ class RFInterface:
         """
         data = self.get_latest_data(samples)
         if not data:
-            return self._get_empty_statistics()
-
+            return get_empty_statistics()
         signals = [d['signal'] for d in data]
         return {
             'mean': float(np.mean(signals)),
             'std': float(np.std(signals)),
             'min': float(np.min(signals)),
             'max': float(np.max(signals))
-        }
-
-    @staticmethod
-    def _get_empty_statistics() -> Dict[str, float]:
-        """Get empty statistics dictionary.
-
-        Returns:
-            Dictionary with zero values for all statistics
-        """
-        return {
-            'mean': 0.0,
-            'std': 0.0,
-            'min': 0.0,
-            'max': 0.0
         }
