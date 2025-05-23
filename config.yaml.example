@@ -24,4 +24,38 @@ max_files: 5
 compress_old: true
 
 # Alert settings
-slack_webhook: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"  # Replace with your webhook URL 
+slack_webhook: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"  # Replace with your webhook URL
+
+# RF Interface Configuration
+rf_interface:
+  sample_rate: 1000  # Samples per second
+  frequency: 433.92  # MHz
+  gain: 20  # dB
+
+# Anomaly Detection Configuration
+anomaly_threshold: 2.0  # Standard deviations for anomaly detection
+
+# Alert Configuration
+alerts:
+  # Email Alerts
+  email:
+    enabled: false
+    smtp_server: smtp.gmail.com
+    smtp_port: 587
+    use_tls: true
+    username: your-email@gmail.com
+    password: your-app-password
+    from: your-email@gmail.com
+    to: recipient@example.com
+
+  # Webhook Alerts
+  webhook:
+    enabled: false
+    url: https://your-webhook-url.com/endpoint
+
+# Logging Configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: rfghost.log
+  max_size: 10485760  # 10MB
+  backup_count: 5 
