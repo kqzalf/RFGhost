@@ -21,8 +21,10 @@ wheels/
 *.egg
 
 # Virtual Environment
-venv/
+.env
+.venv
 env/
+venv/
 ENV/
 
 # IDE
@@ -30,17 +32,19 @@ ENV/
 .vscode/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
 
-# Logs
-logs/
+# Project specific
 *.log
-*.jsonl
-*.jsonl.gz
-
-# Config
+pylint-report.txt
 config.yaml
-!config.yaml.example
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
 
-# OS
+# OS specific
 .DS_Store
 Thumbs.db 

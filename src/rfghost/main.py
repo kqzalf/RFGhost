@@ -4,11 +4,11 @@ import time
 import signal
 from typing import Dict, Any
 import yaml
-from logger import logger
-from anomaly_engine import AnomalyEngine
-from rf_interface import RFInterface
-from alerts import Alerts
-from output_interface import OutputInterface
+from .utils.logger import logger
+from .core.anomaly_engine import AnomalyEngine
+from .core.rf_interface_factory import RFInterfaceFactory
+from .outputs.output_interface import OutputInterface
+from .alerts import Alerts
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
@@ -48,7 +48,9 @@ class RFGhost:
         self.running = False
 
         # Initialize components
-        self.rf_interface = RFInterface(config.get('rf_interface', {}))
+        self.rf_interface = RFInterfaceFactory.create_interface(
+            config.get('rf_interface', {})
+        )
         self.anomaly_engine = AnomalyEngine(
             threshold=config.get('anomaly_threshold', 2.0)
         )
@@ -189,4 +191,4 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main()) 

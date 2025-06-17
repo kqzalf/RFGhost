@@ -53,6 +53,23 @@ alerts:
     enabled: false
     url: https://your-webhook-url.com/endpoint
 
+# Output Configuration
+mqtt:
+  enabled: true
+  host: localhost
+  port: 1883
+  username: your_mqtt_username
+  password: your_mqtt_password
+  topic: rfghost/data
+  retain: true
+  qos: 1
+
+serial:
+  enabled: false
+  port: COM1  # or /dev/ttyUSB0 for Linux
+  baudrate: 9600
+  timeout: 1
+
 # Logging Configuration
 logging:
   level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL

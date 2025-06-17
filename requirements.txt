@@ -1,3 +1,7 @@
 numpy>=1.21.0
 PyYAML>=6.0
-requests>=2.26.0 
+requests>=2.26.0
+paho-mqtt>=2.0.0
+pyserial>=3.5
+pyhackrf>=0.1.0
+libusb1>=1.9.3 
